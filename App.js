@@ -1,36 +1,32 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet,
   View,
   Text,
   TouchableOpacity,
+  Dimensions,
   Animated,
   Easing,
   SafeAreaView,
   StatusBar,
-  ScrollView,
-  Vibration,   // 👈 Import vibration
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+  Vibration,
+  ScrollView
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
-const DIV_ZERO_MSG = "Tora mai ke choco";
-
-export default function App() {
-  const [currentInput, setCurrentInput] = useState("0");
+const Calculator = () => {
+  const [currentInput, setCurrentInput] = useState('0');
+  const [calculation, setCalculation] = useState('');
+  const [currentOperation, setCurrentOperation] = useState(null);
   const [previousValue, setPreviousValue] = useState(null);
-  const [operation, setOperation] = useState(null);
+  const [calculationHistory, setCalculationHistory] = useState([]);
   const [darkMode, setDarkMode] = useState(false);
-  const [history, setHistory] = useState([]);
   const animValue = useRef(new Animated.Value(0)).current;
 
   const buttonScale = animValue.interpolate({
     inputRange: [0, 1],
-    outputRange: [1, 0.85],
+    outputRange: [1, 0.9]
   });
-
-  const vibrate = () => {
-    Vibration.vibrate(30); // small haptic feedback
-  };
 
   const animateButton = () => {
     Animated.sequence([
@@ -38,288 +34,318 @@ export default function App() {
         toValue: 1,
         duration: 50,
         easing: Easing.linear,
-        useNativeDriver: true,
+        useNativeDriver: true
       }),
       Animated.timing(animValue, {
         toValue: 0,
         duration: 50,
         easing: Easing.linear,
-        useNativeDriver: true,
-      }),
+        useNativeDriver: true
+      })
     ]).start();
   };
 
-  const handlePress = (callback) => {
-    vibrate();
+  const vibrate = () => {
+    Vibration.vibrate(50);
+  };
+
+  const handleButtonPress = (callback) => {
     animateButton();
+    vibrate();
     callback();
   };
 
-  const appendNumber = (num) =>
-    handlePress(() => {
-      if (currentInput === "0" || currentInput === DIV_ZERO_MSG) {
-        setCurrentInput(num.toString());
-      } else {
-        setCurrentInput(currentInput + num);
-      }
-    });
+  const appendNumber = (number) => {
+    if (currentInput === '0' || currentInput === 'Tora mai ke choco') {
+      setCurrentInput(number);
+    } else {
+      setCurrentInput(currentInput + number);
+    }
+  };
 
-  const appendDecimal = () =>
-    handlePress(() => {
-      if (!currentInput.includes(".") && currentInput !== DIV_ZERO_MSG) {
-        setCurrentInput(currentInput + ".");
-      }
-    });
-
-  const appendOperation = (op) =>
-    handlePress(() => {
-      if (currentInput === DIV_ZERO_MSG) return clearAll();
-
+  const appendOperation = (operation) => {
+    if (currentInput === 'Tora mai ke choco') {
+      clearAll();
+      return;
+    }
+    
+    if (previousValue === null) {
       setPreviousValue(parseFloat(currentInput));
-      setOperation(op);
-      setCurrentInput("0");
-    });
+    } else if (currentOperation) {
+      calculateResult();
+    }
+    
+    setCurrentOperation(operation);
+    setCalculation(`${previousValue || parseFloat(currentInput)} ${operation}`);
+    setCurrentInput('0');
+  };
 
-  const calculateResult = () =>
-    handlePress(() => {
-      if (operation && previousValue !== null) {
-        const currentValue = parseFloat(currentInput);
+  const appendDecimal = () => {
+    if (!currentInput.includes('.')) {
+      setCurrentInput(currentInput + '.');
+    }
+  };
 
-        if (operation === "÷" && currentValue === 0) {
-          setCurrentInput(DIV_ZERO_MSG); // 👈 custom divide by zero message
-          setPreviousValue(null);
-          setOperation(null);
-          return;
-        }
+  const appendPercentage = () => {
+    if (currentInput !== 'Tora mai ke choco') {
+      setCurrentInput((parseFloat(currentInput) / 100).toString());
+    }
+  };
 
-        let result;
-        switch (operation) {
-          case "+": result = previousValue + currentValue; break;
-          case "-": result = previousValue - currentValue; break;
-          case "×": result = previousValue * currentValue; break;
-          case "÷": result = previousValue / currentValue; break;
-          default: return;
-        }
-
-        const entry = `${previousValue} ${operation} ${currentValue} = ${result}`;
-        setHistory([entry, ...history]);
-
-        setCurrentInput(result.toString());
-        setPreviousValue(null);
-        setOperation(null);
-      }
-    });
-
-  const clearAll = () =>
-    handlePress(() => {
-      setCurrentInput("0");
+  const calculateResult = () => {
+    if (!currentOperation || previousValue === null) return;
+    
+    const currentValue = parseFloat(currentInput);
+    
+    // Handle division by zero
+    if (currentOperation === '÷' && currentValue === 0) {
+      setCurrentInput('Tora mai ke choco');
+      setCalculation('');
       setPreviousValue(null);
-      setOperation(null);
-    });
-
-  const toggleSign = () =>
-    handlePress(() => {
-      if (currentInput !== "0" && currentInput !== DIV_ZERO_MSG) {
-        setCurrentInput((parseFloat(currentInput) * -1).toString());
-      }
-    });
-
-  const percentage = () =>
-    handlePress(() => {
-      if (currentInput !== DIV_ZERO_MSG) {
-        setCurrentInput((parseFloat(currentInput) / 100).toString());
-      }
-    });
-
-  const backspace = () =>
-    handlePress(() => {
-      if (currentInput === DIV_ZERO_MSG) {
-        setCurrentInput("0");
+      setCurrentOperation(null);
+      return;
+    }
+    
+    let result;
+    switch (currentOperation) {
+      case '+':
+        result = previousValue + currentValue;
+        break;
+      case '-':
+        result = previousValue - currentValue;
+        break;
+      case '×':
+        result = previousValue * currentValue;
+        break;
+      case '÷':
+        result = previousValue / currentValue;
+        break;
+      default:
         return;
-      }
+    }
+    
+    // Add to history
+    const historyEntry = `${previousValue} ${currentOperation} ${currentValue} = ${result}`;
+    setCalculationHistory([historyEntry, ...calculationHistory.slice(0, 4)]);
+    
+    setCurrentInput(result.toString());
+    setCalculation(`${previousValue} ${currentOperation} ${currentValue} =`);
+    setPreviousValue(result);
+    setCurrentOperation(null);
+  };
+
+  const clearAll = () => {
+    setCurrentInput('0');
+    setCalculation('');
+    setPreviousValue(null);
+    setCurrentOperation(null);
+  };
+
+  const backspace = () => {
+    if (currentInput !== 'Tora mai ke choco') {
       if (currentInput.length > 1) {
         setCurrentInput(currentInput.slice(0, -1));
       } else {
-        setCurrentInput("0");
+        setCurrentInput('0');
       }
-    });
+    }
+  };
 
-  const handleToggleTheme = () => {
-    vibrate();
+  const toggleTheme = () => {
     setDarkMode(!darkMode);
   };
 
+  const Button = ({ title, onPress, style, textStyle, isOperation = false, isOperator = false, isSpecial = false, isZero = false }) => {
+    const backgroundColor = darkMode ? 
+      (isOperator ? '#ff9500' : isSpecial ? '#a777e3' : '#2a2a2a') : 
+      (isOperator ? '#ff9500' : isSpecial ? '#a777e3' : '#f9f9f9');
+    
+    const color = isOperator || isSpecial ? 'white' : (darkMode ? 'white' : 'black');
+
+    return (
+      <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+        <TouchableOpacity
+          style={[
+            styles.button, 
+            { backgroundColor },
+            isZero && styles.zeroButton,
+            style
+          ]}
+          onPress={() => handleButtonPress(onPress)}
+        >
+          <Text style={[styles.buttonText, { color }, textStyle]}>{title}</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
   const containerStyle = {
-    backgroundColor: darkMode ? "#000" : "#fff",
+    backgroundColor: darkMode ? '#1a1a1a' : '#fff'
   };
 
   const displayStyle = {
-    color: darkMode ? "#fff" : "#000",
+    color: darkMode ? '#fff' : '#000'
   };
 
-  const buttonStyle = {
-    backgroundColor: darkMode ? "#333" : "#eee",
+  const calculationStyle = {
+    color: darkMode ? '#aaa' : '#888'
   };
 
-  const buttonTextStyle = {
-    color: darkMode ? "#fff" : "#000",
+  const historyStyle = {
+    color: darkMode ? '#aaa' : '#888'
   };
-
-  const Button = ({ title, onPress, style, isOperation = false }) => (
-    <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-      <TouchableOpacity
-        style={[
-          styles.button,
-          buttonStyle,
-          isOperation && styles.operationButton,
-          style,
-        ]}
-        onPress={onPress}
-      >
-        <Text style={[styles.buttonText, buttonTextStyle]}>{title}</Text>
-      </TouchableOpacity>
-    </Animated.View>
-  );
 
   return (
     <SafeAreaView style={[styles.container, containerStyle]}>
-      <StatusBar barStyle={darkMode ? "light-content" : "dark-content"} />
-
-      {/* Theme Toggle */}
-      <View style={styles.themeToggle}>
-        <Ionicons
-          name={darkMode ? "moon" : "sunny"}
-          size={28}
-          color={darkMode ? "white" : "black"}
-          onPress={handleToggleTheme}
-        />
+      <StatusBar barStyle={darkMode ? 'light-content' : 'dark-content'} />
+      
+      <View style={styles.header}>
+        <Text style={[styles.headerText, displayStyle]}>Calculator</Text>
+        <TouchableOpacity style={styles.themeToggle} onPress={toggleTheme}>
+          <Ionicons
+            name={darkMode ? 'moon' : 'sunny'}
+            size={24}
+            color={darkMode ? '#6e8efb' : 'black'}
+          />
+        </TouchableOpacity>
       </View>
 
-      {/* Display */}
       <View style={styles.displayContainer}>
-        <Text style={[styles.displayText, displayStyle]} numberOfLines={1}>
-          {currentInput}
-        </Text>
+        <Text style={[styles.calculationText, calculationStyle]}>{calculation}</Text>
+        <Text style={[styles.displayText, displayStyle]}>{currentInput}</Text>
       </View>
 
-      {/* Buttons Grid */}
-      <View style={styles.buttonsGrid}>
+      <View style={[styles.buttonsContainer, darkMode && styles.darkButtonsContainer]}>
         <View style={styles.row}>
-          <Button title="C" onPress={clearAll} isOperation />
+          <Button title="C" onPress={clearAll} isSpecial />
           <Button title="⌫" onPress={backspace} isOperation />
-          <Button title="%" onPress={percentage} isOperation />
-          <Button title="÷" onPress={() => appendOperation("÷")} isOperation />
+          <Button title="%" onPress={appendPercentage} isOperation />
+          <Button title="÷" onPress={() => appendOperation('÷')} isOperator />
         </View>
-
+        
         <View style={styles.row}>
-          <Button title="7" onPress={() => appendNumber(7)} />
-          <Button title="8" onPress={() => appendNumber(8)} />
-          <Button title="9" onPress={() => appendNumber(9)} />
-          <Button title="×" onPress={() => appendOperation("×")} isOperation />
+          <Button title="7" onPress={() => appendNumber('7')} />
+          <Button title="8" onPress={() => appendNumber('8')} />
+          <Button title="9" onPress={() => appendNumber('9')} />
+          <Button title="×" onPress={() => appendOperation('×')} isOperator />
         </View>
-
+        
         <View style={styles.row}>
-          <Button title="4" onPress={() => appendNumber(4)} />
-          <Button title="5" onPress={() => appendNumber(5)} />
-          <Button title="6" onPress={() => appendNumber(6)} />
-          <Button title="-" onPress={() => appendOperation("-")} isOperation />
+          <Button title="4" onPress={() => appendNumber('4')} />
+          <Button title="5" onPress={() => appendNumber('5')} />
+          <Button title="6" onPress={() => appendNumber('6')} />
+          <Button title="-" onPress={() => appendOperation('-')} isOperator />
         </View>
-
+        
         <View style={styles.row}>
-          <Button title="1" onPress={() => appendNumber(1)} />
-          <Button title="2" onPress={() => appendNumber(2)} />
-          <Button title="3" onPress={() => appendNumber(3)} />
-          <Button title="+" onPress={() => appendOperation("+")} isOperation />
+          <Button title="1" onPress={() => appendNumber('1')} />
+          <Button title="2" onPress={() => appendNumber('2')} />
+          <Button title="3" onPress={() => appendNumber('3')} />
+          <Button title="+" onPress={() => appendOperation('+')} isOperator />
         </View>
-
+        
         <View style={styles.row}>
-          <Button title="±" onPress={toggleSign} isOperation />
-          <Button title="0" onPress={() => appendNumber(0)} style={styles.zeroButton} />
+          <Button title="0" onPress={() => appendNumber('0')} isZero />
           <Button title="." onPress={appendDecimal} />
-          <Button title="=" onPress={calculateResult} isOperation style={styles.equalsButton} />
+          <Button title="=" onPress={calculateResult} isOperator />
         </View>
       </View>
 
-      {/* History */}
-      {history.length > 0 && (
-        <ScrollView style={styles.historyContainer}>
-          <Text style={[styles.historyTitle, displayStyle]}>History</Text>
-          {history.slice(0, 5).map((item, index) => (
-            <Text key={index} style={[styles.historyItem, displayStyle]}>
-              {item}
-            </Text>
-          ))}
-        </ScrollView>
+      {calculationHistory.length > 0 && (
+        <View style={styles.historyContainer}>
+          <Text style={[styles.historyTitle, historyStyle]}>History</Text>
+          <ScrollView>
+            {calculationHistory.map((item, index) => (
+              <Text key={index} style={[styles.historyItem, historyStyle]}>{item}</Text>
+            ))}
+          </ScrollView>
+        </View>
       )}
     </SafeAreaView>
   );
-}
+};
+
+const { width } = Dimensions.get('window');
+const buttonSize = width / 4 - 15;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    justifyContent: 'center'
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: 40
+  },
+  headerText: {
+    fontSize: 24,
+    fontWeight: 'bold'
   },
   themeToggle: {
-    position: "absolute",
-    top: 40,
-    right: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   displayContainer: {
-    flex: 1,
-    justifyContent: "flex-end",
-    alignItems: "flex-end",
     padding: 20,
+    alignItems: 'flex-end'
+  },
+  calculationText: {
+    fontSize: 20,
+    marginBottom: 10,
+    minHeight: 24
   },
   displayText: {
-    fontSize: 60,
-    fontWeight: "300",
+    fontSize: 48,
+    fontWeight: '300'
   },
-  buttonsGrid: {
-    flex: 2,
-    justifyContent: "space-evenly",
-    padding: 5,
+  buttonsContainer: {
+    padding: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.03)',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20
+  },
+  darkButtonsContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)'
   },
   row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10
   },
   button: {
-    flex: 1,
-    margin: 5,
-    aspectRatio: 1,
-    borderRadius: 50,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  operationButton: {
-    backgroundColor: "#ff9500",
+    width: buttonSize,
+    height: buttonSize,
+    borderRadius: buttonSize / 2,
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   zeroButton: {
-    flex: 2,
-    aspectRatio: 2.2,
-    borderRadius: 50,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  equalsButton: {
-    backgroundColor: "#ff9500",
+    width: buttonSize * 2 + 10,
+    borderRadius: buttonSize / 2
   },
   buttonText: {
-    fontSize: 28,
-    fontWeight: "500",
+    fontSize: 24
   },
   historyContainer: {
-    maxHeight: 150,
-    padding: 10,
+    marginTop: 20,
+    padding: 15,
+    maxHeight: 150
   },
   historyTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 5,
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10
   },
   historyItem: {
-    fontSize: 16,
-    marginBottom: 5,
-  },
+    fontSize: 14,
+    marginBottom: 5
+  }
 });
+
+export default Calculator;
