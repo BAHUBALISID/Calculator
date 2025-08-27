@@ -4,12 +4,12 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Dimensions,
   Animated,
   Easing,
   SafeAreaView,
   StatusBar,
   ScrollView,
+  Vibration,   // 👈 Import vibration
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -28,6 +28,10 @@ export default function App() {
     outputRange: [1, 0.85],
   });
 
+  const vibrate = () => {
+    Vibration.vibrate(30); // small haptic feedback
+  };
+
   const animateButton = () => {
     Animated.sequence([
       Animated.timing(animValue, {
@@ -45,111 +49,108 @@ export default function App() {
     ]).start();
   };
 
-  const appendNumber = (num) => {
+  const handlePress = (callback) => {
+    vibrate();
     animateButton();
-    if (currentInput === "0" || currentInput === DIV_ZERO_MSG) {
-      setCurrentInput(num.toString());
-    } else {
-      setCurrentInput(currentInput + num);
-    }
+    callback();
   };
 
-  const appendDecimal = () => {
-    animateButton();
-    if (!currentInput.includes(".") && currentInput !== DIV_ZERO_MSG) {
-      setCurrentInput(currentInput + ".");
-    }
-  };
+  const appendNumber = (num) =>
+    handlePress(() => {
+      if (currentInput === "0" || currentInput === DIV_ZERO_MSG) {
+        setCurrentInput(num.toString());
+      } else {
+        setCurrentInput(currentInput + num);
+      }
+    });
 
-  const appendOperation = (op) => {
-    animateButton();
-    if (currentInput === DIV_ZERO_MSG) return clearAll();
+  const appendDecimal = () =>
+    handlePress(() => {
+      if (!currentInput.includes(".") && currentInput !== DIV_ZERO_MSG) {
+        setCurrentInput(currentInput + ".");
+      }
+    });
 
-    setPreviousValue(parseFloat(currentInput));
-    setOperation(op);
-    setCurrentInput("0");
-  };
+  const appendOperation = (op) =>
+    handlePress(() => {
+      if (currentInput === DIV_ZERO_MSG) return clearAll();
 
-  const calculateResult = () => {
-    animateButton();
-    if (operation && previousValue !== null) {
-      const currentValue = parseFloat(currentInput);
+      setPreviousValue(parseFloat(currentInput));
+      setOperation(op);
+      setCurrentInput("0");
+    });
 
-      // Divide by zero handling
-      if (operation === "÷" && currentValue === 0) {
-        setCurrentInput(DIV_ZERO_MSG);
+  const calculateResult = () =>
+    handlePress(() => {
+      if (operation && previousValue !== null) {
+        const currentValue = parseFloat(currentInput);
+
+        if (operation === "÷" && currentValue === 0) {
+          setCurrentInput(DIV_ZERO_MSG); // 👈 custom divide by zero message
+          setPreviousValue(null);
+          setOperation(null);
+          return;
+        }
+
+        let result;
+        switch (operation) {
+          case "+": result = previousValue + currentValue; break;
+          case "-": result = previousValue - currentValue; break;
+          case "×": result = previousValue * currentValue; break;
+          case "÷": result = previousValue / currentValue; break;
+          default: return;
+        }
+
+        const entry = `${previousValue} ${operation} ${currentValue} = ${result}`;
+        setHistory([entry, ...history]);
+
+        setCurrentInput(result.toString());
         setPreviousValue(null);
         setOperation(null);
-        return;
       }
+    });
 
-      let result;
-      switch (operation) {
-        case "+":
-          result = previousValue + currentValue;
-          break;
-        case "-":
-          result = previousValue - currentValue;
-          break;
-        case "×":
-          result = previousValue * currentValue;
-          break;
-        case "÷":
-          result = previousValue / currentValue;
-          break;
-        default:
-          return;
-      }
-
-      const entry = `${previousValue} ${operation} ${currentValue} = ${result}`;
-      setHistory([entry, ...history]);
-
-      setCurrentInput(result.toString());
+  const clearAll = () =>
+    handlePress(() => {
+      setCurrentInput("0");
       setPreviousValue(null);
       setOperation(null);
-    }
-  };
+    });
 
-  const clearAll = () => {
-    animateButton();
-    setCurrentInput("0");
-    setPreviousValue(null);
-    setOperation(null);
-  };
+  const toggleSign = () =>
+    handlePress(() => {
+      if (currentInput !== "0" && currentInput !== DIV_ZERO_MSG) {
+        setCurrentInput((parseFloat(currentInput) * -1).toString());
+      }
+    });
 
-  const toggleSign = () => {
-    animateButton();
-    if (currentInput !== "0" && currentInput !== DIV_ZERO_MSG) {
-      setCurrentInput((parseFloat(currentInput) * -1).toString());
-    }
-  };
+  const percentage = () =>
+    handlePress(() => {
+      if (currentInput !== DIV_ZERO_MSG) {
+        setCurrentInput((parseFloat(currentInput) / 100).toString());
+      }
+    });
 
-  const percentage = () => {
-    animateButton();
-    if (currentInput !== DIV_ZERO_MSG) {
-      setCurrentInput((parseFloat(currentInput) / 100).toString());
-    }
-  };
-
-  const backspace = () => {
-    animateButton();
-    if (currentInput === DIV_ZERO_MSG) {
-      setCurrentInput("0");
-      return;
-    }
-    if (currentInput.length > 1) {
-      setCurrentInput(currentInput.slice(0, -1));
-    } else {
-      setCurrentInput("0");
-    }
-  };
+  const backspace = () =>
+    handlePress(() => {
+      if (currentInput === DIV_ZERO_MSG) {
+        setCurrentInput("0");
+        return;
+      }
+      if (currentInput.length > 1) {
+        setCurrentInput(currentInput.slice(0, -1));
+      } else {
+        setCurrentInput("0");
+      }
+    });
 
   const handleToggleTheme = () => {
+    vibrate();
     setDarkMode(!darkMode);
   };
 
   const containerStyle = {
-    backgroundColor: darkMode ? "#222" : "#fff",
+    backgroundColor: darkMode ? "#000" : "#fff",
   };
 
   const displayStyle = {
@@ -157,14 +158,14 @@ export default function App() {
   };
 
   const buttonStyle = {
-    backgroundColor: darkMode ? "#444" : "#eee",
+    backgroundColor: darkMode ? "#333" : "#eee",
   };
 
   const buttonTextStyle = {
     color: darkMode ? "#fff" : "#000",
   };
 
-  const Button = ({ title, onPress, style, textStyle, isOperation = false }) => (
+  const Button = ({ title, onPress, style, isOperation = false }) => (
     <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
       <TouchableOpacity
         style={[
@@ -175,7 +176,7 @@ export default function App() {
         ]}
         onPress={onPress}
       >
-        <Text style={[styles.buttonText, textStyle]}>{title}</Text>
+        <Text style={[styles.buttonText, buttonTextStyle]}>{title}</Text>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -201,8 +202,8 @@ export default function App() {
         </Text>
       </View>
 
-      {/* Buttons */}
-      <View style={styles.buttonsContainer}>
+      {/* Buttons Grid */}
+      <View style={styles.buttonsGrid}>
         <View style={styles.row}>
           <Button title="C" onPress={clearAll} isOperation />
           <Button title="⌫" onPress={backspace} isOperation />
@@ -254,13 +255,9 @@ export default function App() {
   );
 }
 
-const { width } = Dimensions.get("window");
-const buttonSize = width / 4 - 10;
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
   },
   themeToggle: {
     position: "absolute",
@@ -268,16 +265,19 @@ const styles = StyleSheet.create({
     right: 20,
   },
   displayContainer: {
-    padding: 20,
+    flex: 1,
+    justifyContent: "flex-end",
     alignItems: "flex-end",
-    marginBottom: 20,
+    padding: 20,
   },
   displayText: {
-    fontSize: 48,
+    fontSize: 60,
     fontWeight: "300",
   },
-  buttonsContainer: {
-    paddingHorizontal: 10,
+  buttonsGrid: {
+    flex: 2,
+    justifyContent: "space-evenly",
+    padding: 5,
   },
   row: {
     flexDirection: "row",
@@ -285,9 +285,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   button: {
-    width: buttonSize,
-    height: buttonSize,
-    borderRadius: buttonSize / 2,
+    flex: 1,
+    margin: 5,
+    aspectRatio: 1,
+    borderRadius: 50,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -295,24 +296,27 @@ const styles = StyleSheet.create({
     backgroundColor: "#ff9500",
   },
   zeroButton: {
-    width: buttonSize * 2 + 10,
-    borderRadius: buttonSize / 2,
+    flex: 2,
+    aspectRatio: 2.2,
+    borderRadius: 50,
+    justifyContent: "center",
+    alignItems: "center",
   },
   equalsButton: {
     backgroundColor: "#ff9500",
   },
   buttonText: {
-    fontSize: 24,
+    fontSize: 28,
+    fontWeight: "500",
   },
   historyContainer: {
-    marginTop: 20,
-    padding: 10,
     maxHeight: 150,
+    padding: 10,
   },
   historyTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    marginBottom: 10,
+    marginBottom: 5,
   },
   historyItem: {
     fontSize: 16,
